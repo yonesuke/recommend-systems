@@ -3,6 +3,14 @@ import pandas as pd
 
 @dataclasses.dataclass(frozen=True)
 class Dataset:
+    """Dataset for recommendation system
+    
+    Args:
+    train (pd.DataFrame): Training data
+    test (pd.DataFrame): Test data
+    test_user2items (dict[int, list[int]]): Test data for each user
+    item_content (pd.DataFrame): Item content data
+    """
     train: pd.DataFrame
     test: pd.DataFrame
     test_user2items: dict[int, list[int]]
@@ -10,11 +18,24 @@ class Dataset:
     
 @dataclasses.dataclass(frozen=True)
 class RecommendResult:
+    """Recommend result
+    
+    Args:
+    rating (pd.DataFrame): Rating data
+    user2items (dict[int, list[int]]): Recommended items for each user
+    """
     rating: pd.DataFrame
     user2items: dict[int, list[int]]
     
 @dataclasses.dataclass(frozen=True)
 class Metrics:
+    """Metrics for recommendation system
+    
+    Args:
+    rsme (float): RSME
+    precision_at_k (float): Precision@K
+    recall_at_k (float): Recall@K
+    """
     rsme: float
     precision_at_k: float
     recall_at_k: float
