@@ -1,5 +1,4 @@
 ipywidgets
 matplotlib
 numpy
-polars
-pyarrow
+pandas
