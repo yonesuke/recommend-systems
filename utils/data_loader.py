@@ -3,6 +3,13 @@ import os
 from utils.models import Dataset
 
 class DataLoader:
+    """Data loader for recommendation system
+    
+    Args:
+    n_user (int): Number of users
+    n_test_items (int): Number of test items
+    data_path (str): Path to the data
+    """
     def __init__(
         self, n_user: int = 1000, n_test_items: int = 5, data_path: str = '../data/ml-10M100K'
     ) -> None:
@@ -11,6 +18,11 @@ class DataLoader:
         self.data_path = data_path
         
     def load(self) -> Dataset:
+        """Load the dataset
+        
+        Returns:
+            Dataset: Dataset for recommendation system
+        """
         movielens, movie_content = self._load()
         movielens_train, movielens_test = self._split_data(movielens)
         # ranking用の評価データは、各ユーザーの評価値が4以上の映画だけを正解とする
