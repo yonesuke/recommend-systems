@@ -1,4 +1,4 @@
-import pandas as pd
+import polars as pl
 import os
 from utils.models import Dataset
 
@@ -27,63 +27,96 @@ class DataLoader:
         movielens_train, movielens_test = self._split_data(movielens)
         # ranking用の評価データは、各ユーザーの評価値が4以上の映画だけを正解とする
         # key: user_id, value: list of item_id
-        movielens_test_user2items = (
-            movielens_test[movielens_test['rating'] >= 4]
-            .groupby('userId')['movieId']
-            .apply(list)
-            .to_dict()
+        user2items = (
+            movielens_test
+            .filter(pl.col('rating') >= 4.0)
+            .group_by('user_id').agg(pl.col('movie_id'))
         )
+        movielens_test_user2items = {col[0]: col[1] for col in user2items.iter_rows()}
         return Dataset(movielens_train, movielens_test, movielens_test_user2items, movie_content)
     
-    def _split_data(self, movielens: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-        movielens['rating_order'] = (
-            movielens.groupby('userId')['timestamp']
-            .rank(method='first', ascending=False)
+    def _split_data(self, df_movielens: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
+        df_movielens = (
+            df_movielens.with_columns(
+                pl.col('timestamp').rank(method='ordinal', descending=True)
+                .over('user_id')
+                .alias('rating_order')
+            )
         )
-        movielens_train = movielens[movielens['rating_order'] > self.n_test_items]
-        movielens_test = movielens[movielens['rating_order'] <= self.n_test_items]
-        return movielens_train, movielens_test
+        df_train = df_movielens.filter(pl.col('rating_order') > self.n_test_items)
+        df_test = df_movielens.filter(pl.col('rating_order') <= self.n_test_items)
+        return df_train, df_test
     
-    def _load(self) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def _load(self) -> tuple[pl.DataFrame, pl.DataFrame]:
         # 映画の情報の読み込み（10197作品）
-        m_cols = ['movie_id', 'title', 'genres']
-        movies = pd.read_csv(
-            os.path.join(self.data_path, 'movies.dat'),
-            sep='::',
-            encoding='latin-1',
-            names=m_cols,
-            engine='python'
+        df_movies = (
+            pl.read_csv(
+                os.path.join(self.data_path, 'movies.dat'),
+                has_header=False,
+                truncate_ragged_lines=True
+            )
+            .with_columns(pl.col('column_1').str.split('::'))
+            .with_columns(
+                pl.col('column_1').list[0].alias('movie_id'),
+                pl.col('column_1').list[1].alias('title'),
+                (
+                    pl.when(pl.col('column_1').list.len() > 2)
+                    .then(pl.col('column_1').list[2].str.split('|'))
+                    .otherwise(pl.lit([]))
+                    .alias('genres')
+                )
+            )
+            .drop('column_1')
         )
-        movies['genres'] = movies['genres'].str.split('|')
         
         # ユーザーが付与した映画のタグ情報の読み込み
-        t_cols = ['user_id', 'movie_id', 'tag', 'timestamp']
-        user_tagged_movies = pd.read_csv(
-            os.path.join(self.data_path, 'tags.dat'),
-            sep='::',
-            names=t_cols,
-            engine='python'
+        df_tags = (
+            pl.read_csv(
+                os.path.join(self.data_path, 'tags.dat'),
+                has_header=False,
+            )
+            .with_columns(pl.col('column_1').str.split('::'))
+            .with_columns(
+                pl.col('column_1').list[0].alias('user_id'),
+                pl.col('column_1').list[1].alias('movie_id'),
+                pl.col('column_1').list[2].str.to_lowercase().alias('tag'),
+                pl.from_epoch(pl.col('column_1').list[3].cast(pl.Int32)).alias('timestamp')
+            )
+            .drop('column_1')
         )
-        user_tagged_movies['tag'] = user_tagged_movies['tag'].str.lower()
-        movie_tags = user_tagged_movies.groupby('movie_id')['tag'].apply(list).reset_index()
         
         # tag情報を結合
-        movies = movies.merge(movie_tags, on='movie_id', how='left')
+        df_movies = df_movies.join(
+            df_tags.group_by('movie_id').agg(pl.col('tag')),
+            on='movie_id', how='left'
+        )
         
         # 評価データの読み込み
-        r_cols = ['user_id', 'movie_id', 'rating', 'timestamp']
-        ratings = pd.read_csv(
-            os.path.join(self.data_path, 'ratings.dat'),
-            sep='::',
-            names=r_cols,
-            engine='python'
+        df_ratings = (
+            pl.read_csv(
+                os.path.join(self.data_path, 'ratings.dat'),
+                has_header=False,
+            )
+            .with_columns(pl.col('column_1').str.split('::'))
+            .with_columns(
+                pl.col('column_1').list[0].alias('user_id'),
+                pl.col('column_1').list[1].alias('movie_id'),
+                pl.col('column_1').list[2].cast(pl.Float64).alias('rating'),
+                pl.from_epoch(pl.col('column_1').list[3].cast(pl.Int32)).alias('timestamp')
+            )
+            .drop('column_1')
         )
         
         # user数をn_userに制限
-        valid_user_ids = sorted(ratings['user_id'].unique()[:self.n_user])
-        ratings = ratings[ratings['user_id'].isin(valid_user_ids)]
+        valid_user_ids = (
+            df_ratings.get_column('user_id')
+            .unique(maintain_order=True)
+            .to_list()
+            [:self.n_user]
+        )
+        df_ratings = df_ratings.filter(pl.col('user_id').is_in(valid_user_ids))
         
         # 上記のデータを結合
-        movielens = ratings.merge(movies, on='movie_id')
+        df_movielens = df_ratings.join(df_movies, on='movie_id', how='left')
         
-        return movielens, movies
+        return df_movielens, df_movies
