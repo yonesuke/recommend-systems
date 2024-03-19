@@ -1,20 +1,20 @@
 import dataclasses
-import pandas as pd
+import polars as pl
 
 @dataclasses.dataclass(frozen=True)
 class Dataset:
     """Dataset for recommendation system
     
     Args:
-    train (pd.DataFrame): Training data
-    test (pd.DataFrame): Test data
+    train (pl.DataFrame): Training data
+    test (pl.DataFrame): Test data
     test_user2items (dict[int, list[int]]): Test data for each user
-    item_content (pd.DataFrame): Item content data
+    item_content (pl.DataFrame): Item content data
     """
-    train: pd.DataFrame
-    test: pd.DataFrame
+    train: pl.DataFrame
+    test: pl.DataFrame
     test_user2items: dict[int, list[int]]
-    item_content: pd.DataFrame
+    item_content: pl.DataFrame
     
 @dataclasses.dataclass(frozen=True)
 class RecommendResult:
@@ -24,7 +24,7 @@ class RecommendResult:
     rating (pd.DataFrame): Rating data
     user2items (dict[int, list[int]]): Recommended items for each user
     """
-    rating: pd.DataFrame
+    rating: pl.DataFrame
     user2items: dict[int, list[int]]
     
 @dataclasses.dataclass(frozen=True)
