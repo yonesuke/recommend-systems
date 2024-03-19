@@ -8,9 +8,9 @@ class BaseRecommender(ABC):
     def recommend(self, dataset: Dataset, **kwargs) -> RecommendResult:
         pass
     
-    def run_sample(self) -> None:
+    def run_sample(self, **kwargs) -> None:
         dataset = DataLoader(n_user=1000, n_test_items=5, data_path='../data/ml-10M100K').load()
-        recommend_result = self.recommend(dataset)
+        recommend_result = self.recommend(dataset, **kwargs)
         metrics = MetricCalculator().calc(
             dataset.test.get_column('rating').to_list(),
             recommend_result.rating.get_column('pred_rating').to_list(),
