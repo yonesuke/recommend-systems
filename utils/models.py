@@ -21,7 +21,7 @@ class RecommendResult:
     """Recommend result
     
     Args:
-    rating (pl.DataFrame): Rating data
+    rating (pl.DataFrame): Rating data (expected header: user_id, item_id, pred_rating)
     user2items (dict[int, list[int]]): Recommended items for each user
     """
     rating: pl.DataFrame
