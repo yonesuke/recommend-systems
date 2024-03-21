@@ -4,3 +4,4 @@ numpy
 pandas
 polars
 scikit-learn
+efficient_apriori
