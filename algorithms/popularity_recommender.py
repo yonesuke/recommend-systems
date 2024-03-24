@@ -4,7 +4,6 @@ sys.path.append('..')
 from utils.models import RecommendResult, Dataset
 from algorithms.base_recommender import BaseRecommender
 import polars as pl
-import numpy as np
 
 class PopularityRecommender(BaseRecommender):
     def recommend(self, dataset: Dataset, **kwargs) -> RecommendResult:
